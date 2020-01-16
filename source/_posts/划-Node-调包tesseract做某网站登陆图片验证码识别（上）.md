@@ -10,17 +10,17 @@ tags:
 
 当然了网站名字不好透露，这里放一部分测试数据。
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-3d9d278612337bb0.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/math.jpeg)
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-d1e10ad9d6005ad9.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/math1.jpeg)
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-1fd6eaf04fdbf74b.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/math2.jpeg)
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-c559f65081dfd66d.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/math3.jpeg)
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-c67c2024eb919588.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/math4.jpeg)
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-8e01dc99ca1a6620.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/math5.jpeg)
 
 思路：
 
@@ -121,9 +121,9 @@ const solve = () => {
 
 去干扰前后对比
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-567c2badc0273dcd.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/math.jpeg)
 
-![image](https://upload-images.jianshu.io/upload_images/14253223-51ab3b3b109a42fd.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+![image](/images/out.jpeg)
 
 二、调包处理
 
