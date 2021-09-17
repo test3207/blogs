@@ -1,4 +1,4 @@
-FROM node:12-alpine
+FROM node:16-bullseye-slim
 WORKDIR /usr/src/app
 COPY . .
 RUN npm config set registry https://registry.npm.taobao.org && npm install
