@@ -1,6 +1,7 @@
 FROM node:16-bullseye-slim
 WORKDIR /usr/src/app
-COPY . .
+COPY package*.json .
 RUN npm config set registry https://registry.npm.taobao.org && npm install
+COPY . .
 EXPOSE 4000
 CMD ["npm", "run", "server"]
