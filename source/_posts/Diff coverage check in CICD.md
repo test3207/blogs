@@ -1,7 +1,7 @@
 ---
 title: '[Devops][Diff coverage check in CI/CD]'
 date: 2024-09-07 20:28:21
-updated: 2024-09-07 20:28:21
+updated: 2024-09-09 22:02:13
 tags:
 ---
 
@@ -44,7 +44,8 @@ The whole structure of this repo is quite easy, as this is just a demo, so I bas
 
 The `.gitignore`, `jest.config.js`, `package.json` should explain themselves, as I'm using jest for unit test and related coverage check.
 
-You can ignore `.pipelines` folder, as I tried to implement the whole demo on Azure Devops in the first place, yet I found they don't really grant any free pipeline resources easily. So what matters here is the `.github/workflows` folder only.
+~~You can ignore `.pipelines` folder, as I tried to implement the whole demo on Azure Devops in the first place, yet I found they don't really grant any free pipeline resources easily. So what matters here is the `.github/workflows` folder only.~~
+[Updated] Azure devops gave me the permissions to create one free pipeline. So far you still don't need to check the `.pipelines` folder. I will add some context later when we go through the github actions.
 
 ### The key implementation
 
@@ -180,6 +181,14 @@ Part four, we check the diff coverage. If it's lower than our limit, we fail it 
 
 **Tip:** Don't really set diff coverage target to 100%.
 **Tip:** The key point this workflow can work, is that we generate two cobertura report files, and checkout both main branch and current branch, as we need these things to generate diff check report with pycobertura. This is not the only solution, I believe you can find more solutions for your own projects with different languages and devops platform.
+
+### The implementation for Azure Devops
+
+As mentioned, I applied a free pipeline on Azure Devops. Unfortunately, it's for private projects only, so I can't show you how it will look like. You can only check the `.pipelines` folder for the code.
+
+It's not that much different from github actions. You can search `azure devops build pipelines` to understand how to configure. And you can search `azure devops branch policy` and `build validation` to understand how to configure diff coverage check enforcement.
+
+Feel free to leave a comment in the demo repo if you have any questions about this section.
 
 ## Improvement
 
