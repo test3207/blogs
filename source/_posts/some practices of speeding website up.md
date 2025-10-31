@@ -1,64 +1,74 @@
 ---
-title: 'some practices of speeding website up'
+title: 'Some Practices of Speeding Website Up'
 date: 2021-06-15 15:04:55
-updated: 2021-06-15 15:04:55
+updated: 2025-10-31 21:34:00
 tags:
+  - Web Performance
+  - Optimization
+  - SSL
+  - Image Optimization
 ---
 
-apart from those daily talking, i want to introduce you a few practices lately used to speed our website up
+Apart from the daily discussions, I want to introduce a few practices we recently used to speed up our website.
 
-## ssl inital issue
+## SSL Initial Issue
 
-nowadays we are using let's encrypt a lot, as both safety and free certification. it IS a good choice, for starters, or non-profitable organizations. 
+Nowadays we are using Let's Encrypt extensively, as it provides both security and free certification. It is a good choice for starters or non-profit organizations.
 
-usually it's ok, unless server of let's encrypt is too slow.
+Usually it works fine, unless the Let's Encrypt server is too slow.
 
-why the hell are we talking about server of let's encrypt? let's go back to the [documents](https://letsencrypt.org/docs/) of it:
+Why are we discussing the Let's Encrypt server? Let's go back to their [documentation](https://letsencrypt.org/docs/):
 
-<img src = 'https://minio.test3207.com/hedgedoc/uploads/upload_9172267b4a78defdf1ebf734c5c2ce41.png' width = 400>
+![Let's Encrypt OCSP Documentation](https://minio.test3207.com/hedgedoc/uploads/upload_9172267b4a78defdf1ebf734c5c2ce41.png)
 
-damn yes, the revoke process! people may take the risks of being cheat by a revoked certification. most of the modern browsers will just go check if it's still valid sometimes. (which make it difficult to reproduce: it only checks once in a long time; and it's hard to tell when server of let's encrypt crushed or just too slow)
+Yes, the certificate revocation process! Users may be at risk from revoked certificates. Most modern browsers periodically check certificate validity. (This makes it difficult to reproduce: browsers only check occasionally, and it's hard to determine whether the Let's Encrypt server has crashed or is just slow.)
 
-so here comes one choice: enable OCSP Stapling option on your reverse proxy server, so it will fetch the result for all clients before requests coming.
+One solution is to enable OCSP Stapling on your reverse proxy server, which will pre-fetch the validation result for all clients before requests arrive.
 
-then again, your server may have some connection issues with server of let's encrypt. and occasionally, users may still encounter the same issue, just before your server get the result.
+However, your server may still experience connection issues with the Let's Encrypt server. Occasionally, users may encounter the same problem before your server retrieves the result.
 
-so here comes an advice: if you do need to ensure ssl issue won't happen on your server at any cost, just buy a certification from local enterprise. (sadly, we can't even sure if those providers are part of the reasons why we connect let's encrypt. QwQ)
+Here's my advice: if you absolutely must ensure SSL issues never occur on your server, consider purchasing a certificate from a commercial provider. (Unfortunately, connectivity issues with these providers might also exist.)
 
-if it's not so important, just enable OCSP stapling. it works well most time anyway lol
+If high availability isn't critical, simply enable OCSP stapling. It works well most of the time.
 
-## adaptive size images
+## Adaptive Size Images
 
-![](https://minio.test3207.com/hedgedoc/uploads/upload_c7c9f8c33a1e712e3a49603da69e7ee9.png) now things are going to be wild, stay still amigo.
+![Adaptive Images](https://minio.test3207.com/hedgedoc/uploads/upload_c7c9f8c33a1e712e3a49603da69e7ee9.png)
 
-we know it's really easy to resize a image in front end, using some html codes like:
+This section covers more advanced optimization techniques.
 
-```htmlmixed=
+We know it's easy to resize images on the front end using HTML code like:
+
+```html
 <img src = 'image/example.png' width = 400, height = 200>
 ```
 
-it seems ok for users. but unfortunately, browsers will still download the original unoptimized images, which may takes more than 20mb each!
+This appears acceptable to users. However, browsers still download the original unoptimized images, which can exceed 20MB each!
 
-to reduce the size of clients really need to download, ideally, we need to host different sizes of images. and for new browsers, there are more to do! say chrome support a new compressed format `avif`, which is even smaller than `webp`! (i think `avif` is developed by google itself too)
+To reduce the actual download size, we need to host different image sizes. Modern browsers support even better options! For example, Chrome supports the `avif` format, which is even smaller than `webp`. (Note: AVIF is developed by AOMedia, an alliance including Google, Apple, Mozilla, and others.)
 
-we are not going to dig into the details of each format, we chosen `squoosh-cli` as our solution, and made some changes to make it possible to run in browsers, because:
+We won't dig into the details of each format. We chose `squoosh-cli` as our solution and modified it to run in browsers because:
 
-1. we need multiple formats support, which shares some fimilar interfaces, so it won't take too long to integrate, and have backups for older version of browsers
+1. We need multiple format support with similar interfaces, making integration straightforward and providing fallbacks for older browsers
 
-2. it should be able to run in browsers, so it could be able to implement some kind of offline mode creations, which also saves both users' time and our server resources
+2. It can run in browsers, enabling offline mode creation, which saves both user time and server resources
 
-(yes, we support PWA too, which is another optimization, but not really nessesary to talk here, since it's not such a common scenario which most website may need to consider)
+(We also support PWA, which is another optimization topic. However, it's not a common scenario for most websites, so we won't discuss it here.)
 
-i believe there would be more options if you really want best performance, but we will continue the topic here.
+There are certainly more options available for achieving optimal performance, but let's continue with this approach.
 
-so for the content server, we added a proxy level, to handle those image requests, say a chrome is requesting `image_tiny.avif`, the content server will go check if it exists. if not, return the original image, and start a processor to compress the `tiny` image. the next time it will response a tiny image instead.
+For our content server, we added a proxy layer to handle image requests. For example, when Chrome requests `image_tiny.avif`, the content server checks if it exists. If not, it returns the original image and starts a background process to compress the tiny version. Subsequent requests will receive the optimized image.
 
-of course it doesn't have to be `tiny`, you can set up a serial of image sizes according to your real business. and apart from images, there could be a similar optimization on audio/video. we used `ffmpeg` on that. but video optimization could be tricky, and may have to realated to cdn stuff, or some higher level optimization. so we won't discuss those here.
+The size doesn't have to be `tiny` — you can configure a series of image sizes based on your specific requirements. Similar optimizations can be applied to audio and video files. We use `ffmpeg` for media processing. However, video optimization can be complex and may involve CDN integration or more advanced techniques, which are beyond the scope of this article.
 
-and we still need to be prepared for potential attack. we need to limit the resources this compress process can use, and we need to add a message queue for traffic peaking, which is for operation guys lol, just mention here in case you wrote some stupid code and blame on me looolll
+We must also protect against potential attacks. It's essential to limit the resources available to the compression process and implement a message queue to handle traffic spikes. These precautions ensure system stability and prevent resource exhaustion.
 
-## others
+## Others
 
-we have seen many ways to speed our website up, some could be common and useful, like things above. some could be okay but not significant good, like `server push`, links [here](https://www.nginx.com/blog/nginx-1-13-9-http2-server-push/) if you do want to read. and some is not that easy to conclude, say cache, mq, better sqls, which are based on real scenario, and may not be useful for all of you.
+We have explored various methods to improve website performance. Some are commonly applicable and highly effective, like the techniques above. Others may have limited benefits, such as HTTP/2 Server Push (see [Nginx documentation](https://www.nginx.com/blog/nginx-1-13-9-http2-server-push/) for details).
 
-anyway i hope this really help you guys. and if there are more interesting way to speed things up, please tell me, same account on github.
+> **Update (2025):** HTTP/2 Server Push has been deprecated by major browsers including Chrome. Modern alternatives include HTTP 103 Early Hints or resource preloading via `<link rel="preload">`.
+
+Other optimizations like caching, message queues, and SQL optimization are scenario-dependent and may not be universally applicable.
+
+I hope these insights are helpful for your performance optimization work.

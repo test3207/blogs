@@ -1,33 +1,37 @@
 ---
-title: 'talk about cookies'
+title: 'Talk About Cookies'
 date: 2021-07-04 20:04:18
-updated: 2021-07-04 20:04:18
+updated: 2025-10-31 21:34:00
 tags:
+  - Web Development
+  - HTTP
+  - Cookies
+  - Security
 ---
 
-# talk about cookies
+It's well known that cookies are used to trace users, maintain user sessions, and support stateful features in a stateless HTTP environment.
 
-it's well known that cookies are used to trace users, maintain user sessions, to support stateful features, in a stateless http environment.
+Considering it's part of the infrastructure, we don't often have a chance to dig into it deeply. I recently worked on something related to cross-site requests and tried to solve some compatibility issues. Here's what I learned.
 
-and considering it's part of the infrastructure, we don't have a chance to dig into it often. i recently did something related to cross site request, and tried to solve some of the compatibility issues. so here comes a share.
+> **Note:** For comprehensive documentation on HTTP Cookies, refer to [MDN Web Docs: HTTP Cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies) and [MDN Web Docs: Set-Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie).
 
-## some consensus
+## Some Consensus
 
-cookies are actually special headers of request, can only set by server side using response headers with specific rules of your own. say user login success, and server response with headers like:
+Cookies are actually special headers in requests, which can only be set by the server side using response headers with specific rules. For example, when a user logs in successfully, the server responds with headers like:
 
 `set-cookie: __hostname=value; Path=/; Expires=Wed, 07 Jul 2021 01:42:19 GMT; HttpOnly; Secure; SameSite=Lax`
 
-by standard, server can only set one cookie for each request-response.
+By standard, the server can only set one cookie per `Set-Cookie` header (but can send multiple `Set-Cookie` headers).
 
-and with detailed information, browsers will automatically decide whether should set cookie header or not, and which ones should set.
+With detailed information, browsers will automatically decide whether to set the cookie header and which cookies to include.
 
-the example above is some kind of common usage. and i think we can look into details now.
+The example above represents common usage. Let's look into the details now.
 
-## attributes of set-cookie
+## Attributes of Set-Cookie
 
-in conclusion, a common practice should looks like:
+In conclusion, a common practice should look like:
 
-```typescript=
+```typescript
 res.setHeader('Set-Cookie', '__hostname=cookie', {
     httpOnly: true,
     maxAge,
@@ -37,57 +41,61 @@ res.setHeader('Set-Cookie', '__hostname=cookie', {
 }));
 ```
 
-### domain
+### Domain
 
-it's allowed to set domain attribute to specific cookie share between domain and subdomain like `xxx.com` and `sub.xxx.com`, but we should really avoid to do this, for compatibility concern.
+It's allowed to set the domain attribute to share cookies between a domain and its subdomains like `xxx.com` and `sub.xxx.com`, but we should avoid this for compatibility reasons.
 
-in elder rfc standard, if set `xxx.com`, then `sub.xxx.com` can't use this cookie; if set `.xxx.com` then `sub.xxx.com` or `anything.xxx.com` can use cookie, while `xxx.com` can't.
- 
-in newer rfc standard, the only difference is that if set `.xxx.com`, `xxx.com` can still use this cookie.
+In the older RFC standard, if you set `xxx.com`, then `sub.xxx.com` can't use this cookie. If you set `.xxx.com`, then `sub.xxx.com` or `anything.xxx.com` can use the cookie, while `xxx.com` can't.
 
-so in short, some grandpa browsers may implement differently, and therefore may lead to some weird bugs.
+In the newer RFC standard, the only difference is that if you set `.xxx.com`, `xxx.com` can still use this cookie.
 
-best practice in real world, is trying to implement full site same domain. it could be tricky to implment full site cdn, but we usually host static data on cdn, so it won't bother much if your cdn can't use same cookie as your main site.
+In short, some legacy browsers may implement this differently, which may lead to unexpected bugs.
 
-### expires/maxAge
+The best practice is to implement a same-domain architecture across your entire site. While implementing site-wide CDN with the same domain can be tricky, we usually host static assets on CDN, so it won't cause issues if your CDN can't share cookies with your main site.
 
-they are actually the same thing, to decide how long this session you want to maintain. by default, most browsers will expire it when users close the page if you don't set any.
+### Expires/MaxAge
 
-they shares the same duty, the difference is that `expires` uses `Date` while `maxAge` uses `Number`. `maxAge` takes precedence if both set. here it's better to use `maxAge` only, to save a little bytes for requests.
+These attributes serve the same purpose: determining how long the session should be maintained. By default, most browsers expire cookies when users close the page if neither attribute is set.
 
-### path
+Both serve the same function, but `expires` uses a `Date` value while `maxAge` uses a `Number` (in seconds). If both are set, `maxAge` takes precedence. It's better to use `maxAge` only, to save a few bytes in requests.
 
-a funny thing is that this attribute only narrow down the routes cookies should set. we should do that on server side even if there are requirements anyway. so it's set as `/` for most time.
+### Path
 
-### httpOnly
+An interesting aspect of this attribute is that it only narrows down the routes where cookies should be sent. We should handle this on the server side anyway, so it's usually set to `/`.
 
-should set to forbid client access cookie. like always. never trust clients lol
+### HttpOnly
 
-### secure
+This should always be set to prevent client-side JavaScript access to cookies. Never trust client-side code.
 
-https only. if you are not using https, please do. i can write another post to point out the benifits. but let's focus on the topic now.
+### Secure
 
-### sameSite
+This enforces HTTPS-only transmission. If you're not using HTTPS, please do. I could write another post about the benefits, but let's stay focused on cookies for now.
 
-it could be `lax`/`strict`/`none`.
+### SameSite
 
-`lax` allow frames with cookie, while `strict` doesn't.
+This can be `lax`, `strict`, or `none`.
 
-`none` is used for cross-site requests, and only allowed when `secure` is set.
+`lax` allows cookies in top-level navigations, while `strict` doesn't.
 
-usually `lax` suits most situations.
+`none` is used for cross-site requests and is only allowed when `secure` is also set.
 
-notice that some grandpa browsers doesn't support sameSite attribute, and may not be able to set cookie if it contained any sameSite sttribute. so it would be helpful with some compatibility problems if server check `UA` to decide whether use this attribute.
+Usually `lax` suits most situations.
 
-## cross site related stuff
+Note that some legacy browsers don't support the `sameSite` attribute and may fail to set cookies if it contains any `sameSite` attribute. It can be helpful to check the `User-Agent` to decide whether to use this attribute for compatibility.
 
-normally we use `Access-Control` series headers to solve cors problems, some website just use `Access-Control-Allow-Origin: *` to allow all request from any origin.
+> **Reference:** [MDN: SameSite cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite)
 
-this mostly happens in cdn requests, so it is ok in most cases. however, if we do provide service for different origin site with cookie verification, it won't work with wildcard. beside, some bad guy can abuse your cdn if you don't have any protection. so a better choice than `Access-Control-Allow-Origin: *` is maintain a whitelist. check origin site when server recieve a request, and set specific allow origin. say
+## Cross-Site Related Stuff
 
-```typescript=
+Normally we use `Access-Control` series headers to solve CORS problems. Some websites simply use `Access-Control-Allow-Origin: *` to allow all requests from any origin.
+
+> **Reference:** [MDN: Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+
+This mostly happens in CDN requests, so it's acceptable in most cases. However, if you provide services for different origin sites with cookie verification, it won't work with wildcards. Besides, attackers could abuse your CDN if you don't have any protection. A better choice than `Access-Control-Allow-Origin: *` is to maintain a whitelist. Check the origin site when the server receives a request and set a specific allow origin. For example:
+
+```typescript
 const { origin } = req.headers;
-if (!whilelist.includes(origin)) {
+if (!whitelist.includes(origin)) {
     res.writeHead(404);
     res.end();
     return;
@@ -95,14 +103,25 @@ if (!whilelist.includes(origin)) {
 res.setHeader('Access-Control-Allow-Origin', origin);
 ```
 
-chrome support `sameSite` attribute to avoid CSRF attack. if we want to support cross site request with cookie, there is one more thing we need to consider.
+Chrome supports the `sameSite` attribute to avoid CSRF attacks. If we want to support cross-site requests with cookies, there's one more thing we need to consider.
 
-configuring `sameSite=none`, all websites have the possibility to request your apis, even from `phishing.com`. attackers may build a very similar website as your real one, and mislead users to click some dangerous button. so apart from that configuring, we also need to check the origin that requesting these `sameSite=none` apis, if it is not in the whitelist, ignore the cookie too.
+> **Reference:** [MDN: Cross-Site Request Forgery (CSRF)](https://developer.mozilla.org/en-US/docs/Glossary/CSRF)
 
-## epilogue
+When configuring `sameSite=none`, all websites have the possibility to request your APIs, even from `phishing.com`. Attackers may build a very similar website to yours and mislead users into clicking dangerous buttons. Apart from that configuration, we also need to check the origin requesting these `sameSite=none` APIs. If it's not in the whitelist, ignore the cookie as well.
 
-maybe you have noticed that some of the websites now showing a hint when you first entering their pages, saying you can choose or not, to allow website uses cookie. yes people nowadays more privacy-conscious, and i think there is going to be some standard later, to forbid big companies collect user information.
+## Epilogue
 
-cookies exists for a long long time, maybe a little outdated. google are trying to establish some new mechanism to avoid abusement of cookies, export several specific api in browsers to support login, user trace, etc. it seems promising i have to say, but a bad fact is that there are still tons of users using ie. which means those compatibility issues may still there for a long long time lol.
+You may have noticed that some websites now show a notification when you first visit their pages, allowing you to choose whether to allow cookies. Yes, people are increasingly privacy-conscious, and I believe there will be standards later to prevent large companies from collecting user information.
 
-anyway thanks for your reading. seeya
+Cookies have existed for a long time and may be somewhat outdated. Google is trying to establish new mechanisms to prevent cookie abuse by providing specific APIs in browsers to support login, user tracking, etc. It seems promising, but the reality is that many users still use legacy browsers, which means these compatibility issues may persist for a long time.
+
+> **Update (2025):** Google's Privacy Sandbox initiative has introduced several alternatives to third-party cookies, including Topics API, Protected Audience API, and Attribution Reporting API. However, adoption is still ongoing. Learn more at [Privacy Sandbox](https://privacysandbox.com/).
+
+## Further Reading
+
+- [MDN: HTTP Cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies)
+- [MDN: Set-Cookie Header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie)
+- [MDN: Cookie Security](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#security)
+- [MDN: Third-party Cookies](https://developer.mozilla.org/en-US/docs/Web/Privacy/Third-party_cookies)
+
+Thank you for reading.
