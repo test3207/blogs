@@ -1,14 +1,14 @@
 ---
-title: '[划][Node][调包tesseract做某网站登陆图片验证码识别（上）]'
+title: '[划][Node][调包Tesseract做某网站登录图片验证码识别（上）]'
 date: 2019-09-29 12:30:28
-updated: 2019-09-29 12:30:28
-tags:
+updated: 2025-10-31 21:34:00
+tags: [Node.js, OCR, Tesseract, Image Processing, Automation]
 ---
-因业务需要，要做某网站的模拟登陆，有个比较简单的图片验证码。
+因业务需要，要实现某网站的模拟登录，涉及一个相对简单的图片验证码。
 
-之前登陆的话，同事用的基本都是js逆向。然而已经是前同事了，然而逆向的工作量我是不愿意接受的，所以划水的时候做了一个小demo，尝试解决这个问题。
+之前的登录方案，同事采用的基本都是 JS 逆向。然而逆向的工作量较大，因此尝试了另一种思路来解决这个问题。
 
-当然了网站名字不好透露，这里放一部分测试数据。
+出于隐私考虑，网站名称不便透露，这里仅展示部分测试数据。
 
 ![image](/images/math.jpeg)
 
@@ -24,36 +24,36 @@ tags:
 
 思路：
 
-首先看下商业上是怎么处理图片验证码的，借鉴一下。
+首先参考商业化解决方案，了解图片验证码的常见处理方式。
 
-百度图像识别，图像文本识别等关键词，出现了ali和tx的广告（打钱），有一个关键词频繁出现：OCR；于是又搜了一下OCR，OCR （Optical Character Recognition，光学字符识别），这个应该算是比较具体的技术名字了；拿这个关键词去GitHub搜一下，果然有[现成的东西](https://github.com/tesseract-ocr/tesseract)
+百度搜索"图像识别"、"图像文本识别"等关键词，出现了阿里云和腾讯云的广告，有一个关键词频繁出现：OCR。进一步搜索 OCR（Optical Character Recognition，光学字符识别），这是一个成熟的技术方向。在 GitHub 搜索该关键词，找到了[现成的开源项目](https://github.com/tesseract-ocr/tesseract)。
 
-下载下来好好康康，C++写的，win/linux都能用，直接用cli操作，指定输出路径。那这就很勇了，安装走起。
+该项目使用 C++ 编写，支持 Windows/Linux 平台，可通过 CLI 操作并指定输出路径。安装后进行测试。
 
-自己用画图手写了几个算式，识别效果还不错。然而直接用目标网站的图片就凉凉了……
+使用画图工具手写了几个算式，识别效果良好。然而直接用目标网站的图片识别效果不佳。
 
-这里简单分析了一下，应该是图片内容有问题，可以看上面的测试数据集，多了一部分干扰线；再一个tesseract的设置应该也有问题，虽然什么都没有识别出来，但是结果集是一个四行的空文档。后者直接看tesseract的文档，有一个配置项--psm，是预指定的识别模式，看了一下选择13，单行识别模式。前者的话，这一版是暂时做了简单的图像处理。
+分析原因：第一，图片内容存在问题，可以看上面的测试数据集，存在较多干扰线。第二，Tesseract 的配置需要优化，虽然未识别出任何内容，但结果是一个四行的空文档。针对后者查阅 Tesseract 文档，发现有一个配置项 `--psm`，用于预指定识别模式，选择模式 13（单行识别模式）。针对前者，本版本采用了简单的图像预处理。
 
-那么整体的处理模块就分为两个部分了：第一个，图像去干扰；第二个，调包生成结构再处理；
+因此，整体处理模块分为两个部分：第一，图像去干扰；第二，调用 OCR 生成结果并处理。
 
 一、图像去干扰
 
-这个图片集本身是比较简单的（这也是我做着玩也能做出来的原因，笑，不过思路还是可以分享一下）
+该图片集本身相对简单（这也是能够实现的原因，思路可供参考）。
 
-分析一下图片，第一，图片四周一圈单像素的干扰信息，看上去就是一个黑框；第二，图片中的干扰像素和信息像素颜色区分度还算是比较高的，信息像素基本是偏向黑色的，后期查看虽然不是完全的#000000，rgb值都确实是普遍小于干扰像素的。那么就设置一个阈值，筛选出不是那么黑的像素点，直接涂白就行了。
+分析图片特征：第一，图片四周存在单像素的干扰信息，呈现为黑框。第二，图片中的干扰像素和信息像素颜色区分度较高，信息像素基本偏向黑色，虽然不完全是 #000000，但 RGB 值普遍小于干扰像素。因此设置一个阈值，筛选出不够黑的像素点，直接涂白处理。
 
 具体代码如下：
 
 ```javascript
-const getPixels = require('get-pixels') // 这个包比较老，只能用回调，promisify都救不回来
+const getPixels = require('get-pixels') // 该包较旧，仅支持回调，promisify 无法处理
 
 const fs = require('fs')
 
-const jpeg = require('jpeg-js') // 只有getPixels，没有setPixels。手动反向操作加密图片内容后再输出
+const jpeg = require('jpeg-js') // 仅有 getPixels，没有 setPixels。需手动反向操作加密图片内容后再输出
 
 const { exec } = require('child_process')
 
-const detach = 30 // 颜色阈值，一边试一边调，手动调到一个合适的水平
+const detach = 30 // 颜色阈值，需逐步调试到合适水平
 
 let pic = 'math'
 
@@ -61,59 +61,59 @@ process.argv[2] && (pic += process.argv[2])
 
 const solve = () => {
 
-  getPixels(`${pic}.jpeg`, (err, pixels) => {
+  getPixels(`${pic}.jpeg`, (err, pixels) => {
 
-    if (err) {
+    if (err) {
 
-      return
+      return
 
-    }
+    }
 
-    let x = pixels.shape[0]
+    let x = pixels.shape[0]
 
-    let y = pixels.shape[1]
+    let y = pixels.shape[1]
 
-    for (let i = 0 ; i < x ; i++) {
+    for (let i = 0 ; i < x ; i++) {
 
-      for (let j = 0 ; j < y ; j++) {
+      for (let j = 0 ; j < y ; j++) {
 
-        let r = pixels.get(i, j, 0)
+        let r = pixels.get(i, j, 0)
 
-        let g = pixels.get(i, j, 1)
+        let g = pixels.get(i, j, 1)
 
-        let b = pixels.get(i, j, 2)
+        let b = pixels.get(i, j, 2)
 
-        // let a = pixels.get(i, j, 3)
+        // let a = pixels.get(i, j, 3)
 
-        if (r > detach || g > detach || b > detach || i === 0 || j === 0 || i === (x - 1) || j === (y - 1)) {
+        if (r > detach || g > detach || b > detach || i === 0 || j === 0 || i === (x - 1) || j === (y - 1)) {
 
-          pixels.set(i, j, 0, 255)
+          pixels.set(i, j, 0, 255)
 
-          pixels.set(i, j, 1, 255)
+          pixels.set(i, j, 1, 255)
 
-          pixels.set(i, j, 2, 255)
+          pixels.set(i, j, 2, 255)
 
-        }
+        }
 
-      }
+      }
 
-    }
+    }
 
-    let temp = {
+    let temp = {
 
-      width: x,
+      width: x,
 
-      height: y,
+      height: y,
 
-      data: pixels.data
+      data: pixels.data
 
-    }
+    }
 
-    fs.writeFileSync('./out.jpeg', jpeg.encode(temp).data)
+    fs.writeFileSync('./out.jpeg', jpeg.encode(temp).data)
 
-   // orc() // 调包处理
+   // ocr() // 调用 OCR 处理
 
-  })
+  })
 
 }
 
@@ -125,53 +125,55 @@ const solve = () => {
 
 ![image](/images/out.jpeg)
 
-二、调包处理
+二、调用 OCR 处理
 
-这个没啥好说的，windows下的安装包[下载地址](https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe)
+Windows 下的安装包[下载地址](https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe)。
 
-这个一路点点点下一步就好，安装完需要手动设置环境变量，环境变量不会设置的百度一下吧……
+安装过程按提示操作即可，安装完成后需手动设置环境变量。
 
-会linux的就不用说了吧……
+Linux 用户请参考官方文档进行安装。
 
 对应代码如下：
 
 ```javascript
-const orc = () => {
+const ocr = () => {
 
-  exec('tesseract out.jpeg out --psm 13', () => {
+  exec('tesseract out.jpeg out --psm 13', () => {
 
-    const s = fs.readFileSync('./out.txt').toString('utf8')
+    const s = fs.readFileSync('./out.txt').toString('utf8')
 
-    let res
+    let res
 
-    let nums = s.match(/\d+/g)
+    let nums = s.match(/\d+/g)
 
-    if (s.match(/\+/)) {
+    if (s.match(/\+/)) {
 
-      res = Number(nums[0]) + Number(nums[1])
+      res = Number(nums[0]) + Number(nums[1])
 
-    } else if (s.match(/-/)) {
+    } else if (s.match(/-/)) {
 
-      res = Number(nums[0]) - Number(nums[1])
+      res = Number(nums[0]) - Number(nums[1])
 
-    } else if (s.match(/x/)) {
+    } else if (s.match(/x/)) {
 
-      res = Number(nums[0]) * Number(nums[1])
+      res = Number(nums[0]) * Number(nums[1])
 
-    } else if (s.match(/÷/)) {
+    } else if (s.match(/÷/)) {
 
-      res = Number(nums[0]) / Number(nums[1])
+      res = Number(nums[0]) / Number(nums[1])
 
-    }
+    }
 
-    console.log(res)
+    console.log(res)
 
-  })
+  })
 
 }
 
 ```
 
-差不多就是这样了，试一试，发现了两个问题，乘号被识别为了小写字母字符x，这个将就一下也可以用；除号基本识别不出来，这个就不是三分钟能解决的问题了。好在这个东西识别错了也没什么大问题，再调一次接口就好了。
+测试发现两个问题：乘号被识别为小写字母 x，可以通过正则匹配处理；除号基本无法识别，这需要更深入的解决方案。好在识别失败的影响不大，可以重新调用接口。
 
-所以既然这一期的标题里有一个“上”字，那这篇文章就讲到这里了；下一期划水的时候，我想尝试一下tesseract训练集，专门处理一下乘号、除号无法识别的问题。
+本篇文章到此结束。下一期计划尝试训练 Tesseract 训练集，专门优化乘号、除号的识别问题。
+
+> **Update (2025):** 由于业务需求变更，本文原计划的下篇（Tesseract 训练集优化）未能完成。不过本文介绍的图像预处理 + OCR 识别的基本思路仍具有参考价值。

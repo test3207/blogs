@@ -1,8 +1,12 @@
 ---
-title: '[Devops][Diff coverage check in CI/CD]'
+title: '[DevOps][Diff Coverage Check in CI/CD]'
 date: 2024-09-07 20:28:21
-updated: 2024-09-09 22:02:13
+updated: 2025-10-31 21:34:00
 tags:
+  - DevOps
+  - CI/CD
+  - Testing
+  - Code Coverage
 ---
 
 ## What's the diff coverage check?
@@ -44,16 +48,16 @@ The whole structure of this repo is quite easy, as this is just a demo, so I bas
 
 The `.gitignore`, `jest.config.js`, `package.json` should explain themselves, as I'm using jest for unit test and related coverage check.
 
-~~You can ignore `.pipelines` folder, as I tried to implement the whole demo on Azure Devops in the first place, yet I found they don't really grant any free pipeline resources easily. So what matters here is the `.github/workflows` folder only.~~
-[Updated] Azure devops gave me the permissions to create one free pipeline. So far you still don't need to check the `.pipelines` folder. I will add some context later when we go through the github actions.
+~~You can ignore `.pipelines` folder, as I tried to implement the whole demo on Azure DevOps in the first place, yet I found they don't really grant any free pipeline resources easily. So what matters here is the `.github/workflows` folder only.~~
+[Updated] Azure DevOps gave me the permissions to create one free pipeline. So far you still don't need to check the `.pipelines` folder. I will add some context later when we go through the GitHub Actions.
 
 ### The key implementation
 
-As mentioned, the diff coverage compares diff bewteen target branch and current branch, so the first thing we need to know, is the coverage of target branch, which is the "main" branch here in this demo.
+As mentioned, the diff coverage compares diff between target branch and current branch, so the first thing we need to know, is the coverage of target branch, which is the "main" branch here in this demo.
 
 So for this `main.yml` workflow:
 
-```yaml=
+```yaml
 jobs:
   check-coverage:
     runs-on: ubuntu-latest
@@ -72,13 +76,13 @@ jobs:
 
 It generates a coverage report every time the main branch changed. It will publish the coverage report to artifact, so we can use it later when we start to compare.
 
-**Tip:** we can either generate the coverage report on main branch, or each time when we create the pull request. It may takes a similar cost when the project is small, but when the project become bigger and bigger, run the unit tests for main branch can cost much more(yep, I mean both money and time).
+**Tip:** We can either generate the coverage report on main branch, or each time when we create the pull request. It may takes a similar cost when the project is small, but when the project become bigger and bigger, run the unit tests for main branch can cost much more (yep, I mean both money and time).
 
-**Tip:** if you don't really know what some tasks mean here, you can copy the `uses` part and search it. Most of them are github actions in marketplace. They are well documented.
+**Tip:** If you don't really know what some tasks mean here, you can copy the `uses` part and search it. Most of them are GitHub Actions in marketplace. They are well documented.
 
 Now for the compare step, let's dive into `pull_request.yml` workflow:
 
-```yaml=
+```yaml
 jobs:
   check-diff-coverage:
     runs-on: ubuntu-latest
@@ -180,13 +184,14 @@ Part three, we use this pycobertura tool to generate diff report.
 Part four, we check the diff coverage. If it's lower than our limit, we fail it by using exit 1.
 
 **Tip:** Don't really set diff coverage target to 100%.
-**Tip:** The key point this workflow can work, is that we generate two cobertura report files, and checkout both main branch and current branch, as we need these things to generate diff check report with pycobertura. This is not the only solution, I believe you can find more solutions for your own projects with different languages and devops platform.
 
-### The implementation for Azure Devops
+**Tip:** The key point this workflow can work, is that we generate two Cobertura report files, and checkout both main branch and current branch, as we need these things to generate diff check report with pycobertura. This is not the only solution, I believe you can find more solutions for your own projects with different languages and DevOps platform.
 
-As mentioned, I applied a free pipeline on Azure Devops. Unfortunately, it's for private projects only, so I can't show you how it will look like. You can only check the `.pipelines` folder for the code.
+### The Implementation for Azure DevOps
 
-It's not that much different from github actions. You can search `azure devops build pipelines` to understand how to configure. And you can search `azure devops branch policy` and `build validation` to understand how to configure diff coverage check enforcement.
+As mentioned, I applied a free pipeline on Azure DevOps. Unfortunately, it's for private projects only, so I can't show you how it will look like. You can only check the `.pipelines` folder for the code.
+
+It's not that much different from GitHub Actions. You can search `azure devops build pipelines` to understand how to configure. And you can search `azure devops branch policy` and `build validation` to understand how to configure diff coverage check enforcement.
 
 Feel free to leave a comment in the demo repo if you have any questions about this section.
 
@@ -194,15 +199,15 @@ Feel free to leave a comment in the demo repo if you have any questions about th
 
 To keep this post still nice and short, I won't add any more content with codes. Just put some improvement ideas here:
 
-### Configure status check in github
+### Configure Status Check in GitHub
 
-The check in the workflow is not enforced. To ensure enforcement, you need to configure "Require status checks to pass" in Rules. You can refer to [github document](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/about-status-checks) to configure.
+The check in the workflow is not enforced. To ensure enforcement, you need to configure "Require status checks to pass" in Rules. You can refer to [GitHub document](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/about-status-checks) to configure.
 
-### Merge main before checking
+### Merge Main Before Checking
 
 As you may notice, the result of diff coverage check in this progress can be incorrect if the current branch is not up to date to the main branch. You can either configure ask team to merge remote main once before they create a PR, or merge remote main when comparing in the workflow.
 
-### Skip checking when no js file changes
+### Skip Checking When No JS File Changes
 
 You can run some git commands to check if js file changes and speed up your pipelines a little.
 

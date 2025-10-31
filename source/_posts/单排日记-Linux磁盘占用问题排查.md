@@ -1,65 +1,68 @@
 ---
 title: '[单排日记][Linux磁盘占用问题排查]'
 date: 2019-11-15 13:21:53
-updated: 2019-11-15 13:21:53
-tags:
+updated: 2025-10-31 21:34:00
+tags: [Linux, Docker, DevOps, Troubleshooting, Redis]
 ---
-## Linux磁盘占用问题排查
+## Linux 磁盘占用问题排查
 
-这几天生产服务器硬盘空间满了，服务老是挂掉。问了下老同事，一直有这个问题。
+生产服务器硬盘空间满，服务频繁挂掉。经了解，此问题一直存在。
 
-基本上生产服务器不会有什么别的东西，一般就是Nginx日志文件默认配置，长期用会吃掉一些空间，但是是可以手动配置最大日志占用空间的；然后可疑的地方大致就是docker。
+基本上生产服务器不会有太多额外内容，一般就是 Nginx 日志文件使用默认配置，长期运行会占用一些空间，但可以手动配置最大日志占用空间；另一个可疑的地方是 Docker。
 
-## 快速定位问题并暂时修复
+## 快速定位问题并临时修复
 
-所以，总之先df -h看下磁盘占用，果然某overlay占用上天了。赶紧先docker rm掉一些旧的image，虽然只空出来2g左右的空间，但是还是能先把生产服务稳定了。
+使用 `df -h` 查看磁盘占用，发现某 overlay 占用过高。立即执行 `docker rmi` 清理一些旧的 image，虽然只释放了 2GB 左右的空间，但足以暂时稳定生产服务。
 
-大体上，这边CICD是配合自建gitlab+自建docker registry，通过swarm来管理的，每一份image都会在生产环境下拉取，再写个定时任务、清理掉2天前的image。
+当前 CI/CD 配置：自建 GitLab + 自建 Docker Registry，通过 Swarm 管理，每份 image 都会在生产环境拉取。计划添加定时任务，清理 2 天前的 image。
 
-看起来问题不大（除非2天内疯狂发几百个版）（遗憾的是，按照这里的开发规范，这种事情理论上的可行的），所以这里暂时不管了。如果后续要改进，就要考虑权限管理问题，然而讲道理gitlab本身就是有权限控制的啊，所以这本质上……
+> **Note (2019):** 当时使用 Docker Swarm 进行容器编排。现代生产环境更多采用 Kubernetes。对于 Docker Registry 清理，建议使用 Registry 的垃圾回收机制（`registry garbage-collect`）而非仅依赖定时任务。
 
-## 回来再看看磁盘占用还有什么可以改的
+理论上问题不大（除非 2 天内频繁发布数百个版本，虽然按照当前开发规范，这种情况理论上可能发生）。后续如果需要改进，需要考虑权限管理问题。
+
+## 进一步分析磁盘占用情况
 
 ```bash
 docker system df -v
 ```
 
-通过命令查看image、container和volume的具体占用情况。
+通过命令查看 image、container 和 volume 的具体占用情况。
 
-image占用异常的情况，可能就是上述的，不打tag而选择定时任务清理，配合开发流程上的缺陷，这些事件共同促成的。
+Image 占用异常的情况，可能是由于不打 tag 而选择定时任务清理，配合开发流程上的缺陷共同导致。
 
-contanier非常轻量化，很多都是以b为单位的，基本不会出现问题。
+Container 非常轻量化，很多都是以字节为单位，基本不会出现问题。
 
-volume常见的也是日志文件，或者使用容器时不指定卷名，导致群魔乱舞，又或者甚至是数据库文件（茶）。
+Volume 常见问题包括：日志文件、使用容器时不指定卷名导致混乱，或者数据库文件占用过大。
 
-没错我看到了一个19gb的volume，明晃晃写着prod_redis……自建redis，开了aof持久化，然而并没有写自动重建，所以aof稳定上升，直到今天。（今天又学到了一种超隐蔽的延时bug了呢！以后接外包不结尾款……）
+发现一个 19GB 的 volume，标识为 `prod_redis`。自建 Redis 开启了 AOF 持久化，但未配置自动重建，导致 AOF 文件持续增长。
 
-话不多说，直接讲解决方案：
+解决方案如下：
 
-首先
+首先清理无用资源：
 
 ```bash
 docker system prune -a
 ```
 
-清理掉无用的image和container
+清理无用的 image 和 container。
 
-然后ssh或者docker attach进到redis服务里面
+然后通过 SSH 或 `docker attach` 进入 Redis 服务：
 
 ```bash
-redis-cli bgaofrewrite
+redis-cli BGREWRITEAOF
 ```
 
-重建aof文件，整个重建过程会先生成新的aof文件，再删除旧的，因此如果本身一点空间都没有了，是没法重建的，就只能先加硬盘了。手动跑一遍的意义在于确认剩余空间是否足够，并且重置自动重建的阈值。自动重建是根据上一次重建的文件大小的比例来确认重建时机的，因此像现在这么大的aof文件，即使打开自动重建也会达不到阈值无法生效。
+重建 AOF 文件。整个重建过程会先生成新的 AOF 文件，再删除旧的，因此如果空间完全不足，需要先扩容硬盘。手动执行的意义在于确认剩余空间是否足够，并重置自动重建的阈值。自动重建是根据上一次重建的文件大小的比例来确认重建时机的，当前 AOF 文件过大，即使启用自动重建也可能达不到阈值。
 
-最后修改redis启动命令
+最后修改 Redis 启动命令：
 
-redis-server
---appendonly
-yes
---auto-aof-rewrite-percentage
-200
---auto-aof-rewrite-min-size
-5gb
+```bash
+redis-server \
+--appendonly yes \
+--auto-aof-rewrite-percentage 200 \
+--auto-aof-rewrite-min-size 5gb
+```
 
-设置合适的重建时机。这个本身volume没有命名，问题不大，毕竟redis也不太会更新。
+设置合适的重建时机。由于该 volume 未命名，且 Redis 更新频率低，影响不大。
+
+> **Note (2025):** Redis 7.0+ 引入了 Multi-part AOF 机制，可以更高效地管理 AOF 文件。现代部署建议考虑使用 RDB + AOF 混合持久化模式，并配置合理的 `maxmemory-policy`。
